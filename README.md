@@ -33,13 +33,15 @@ mvn test
 ```bash
 curl -X POST localhost:8080/api/matches -H 'Content-Type: application/json' \
   -d '{"teamA":"India","teamB":"Australia","oversLimit":5}'
+
 curl -X POST localhost:8080/api/matches/1/start
+
 curl -X POST localhost:8080/api/matches/1/events -H 'Content-Type: application/json' \
   -d '{"eventId":"e-001","type":"RUNS","runs":4,"batter":"Kohli","bowler":"Starc"}'
 ```
 
-Event types: `RUNS` (0-6), `WICKET` (0-3 runs), `WIDE` (0-4 extra), `NO_BALL` (0-6 off the bat), `BYE` / `LEG_BYE` (1-4).
-Responses: `201` new event, `200` duplicate `eventId`, `409` too much contention (safe to retry), `422` rule violation, `429` rate limited.
+- **Event types:** `RUNS` (0-6), `WICKET` (0-3 runs), `WIDE` (0-4 extra), `NO_BALL` (0-6 off the bat), `BYE` / `LEG_BYE` (1-4).
+- **Responses:** `201` new event, `200` duplicate `eventId`, `409` too much contention (safe to retry), `422` rule violation, `429` rate limited.
 
 ## Design decisions (good interview talking points)
 
@@ -63,4 +65,5 @@ Responses: `201` new event, `200` duplicate `eventId`, `409` too much contention
 ```bash
 k6 run -e MATCH=1 loadtest/read-score.js
 ```
+
 Record your own p95 latency and throughput, with and without Redis, and only then write numbers on your resume.
