@@ -37,7 +37,7 @@ public class MatchSimulator implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        MatchState match = service.create(new CreateMatchRequest("India", "Australia", overs, null));
+        MatchState match = service.create(new CreateMatchRequest("India", "Australia", overs));
         service.start(match.id());
         log.info("Simulating match {}. Open http://localhost:8080/?match={}", match.id(), match.id());
 
@@ -49,15 +49,24 @@ public class MatchSimulator implements CommandLineRunner {
     private void play(Long id) {
         String[] batters = {"Rohit", "Gill", "Kohli", "Pant", "Hardik", "Jadeja", "Axar", "Bumrah", "Shami", "Siraj", "Kuldeep"};
         int striker = 0;
+        int innings = 1;
         try {
             while (true) {
                 Ball b = nextBall();
                 MatchState s = service.submit(id, new BallEventRequest(
                         UUID.randomUUID().toString(), b.type, b.runs, batters[Math.min(striker, 10)], "Starc")).state();
                 if (b.type == EventType.WICKET) striker++;
-                log.info("{} runs={} -> {}/{} ({})", b.type, b.runs, s.runs(), s.wickets(), s.overs());
+                if (s.innings() != innings) {
+                    innings = s.innings();
+                    striker = 0;
+                    log.info("Innings 1 over: {} {}/{}. {} need {} to win.",
+                            s.firstInnings().team(), s.firstInnings().runs(), s.firstInnings().wickets(),
+                            s.battingTeam(), s.target());
+                } else {
+                    log.info("Inn {} {} runs={} -> {}/{} ({})", s.innings(), b.type, b.runs, s.runs(), s.wickets(), s.overs());
+                }
                 if (s.status().name().equals("COMPLETED")) {
-                    log.info("Innings complete: {}/{} in {} overs", s.runs(), s.wickets(), s.overs());
+                    log.info("RESULT: {}", s.result());
                     return;
                 }
                 Thread.sleep(delayMs);

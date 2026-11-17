@@ -12,24 +12,31 @@
   body { margin:0; font-family:system-ui,sans-serif; background:var(--bg); color:var(--text); display:grid; place-items:center; min-height:100vh; }
   .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:28px; width:min(92vw,420px); }
   .teams { color:var(--muted); font-size:14px; }
+  .innings { font-size:14px; font-weight:600; margin-top:6px; }
   .score { font-size:56px; font-weight:700; margin:8px 0; }
   .row { display:flex; justify-content:space-between; color:var(--muted); font-size:14px; padding:4px 0; }
   .row b { color:var(--text); }
   .status { display:inline-block; font-size:12px; font-weight:600; color:var(--accent); border:1px solid var(--accent); border-radius:99px; padding:2px 10px; }
+  .need { margin-top:10px; font-size:14px; font-weight:600; color:var(--accent); }
+  .result { margin-top:14px; padding:12px; border-radius:10px; background:var(--accent); color:#fff; font-weight:700; text-align:center; }
   .hint { color:var(--muted); font-size:12px; margin-top:16px; }
 </style>
 </head>
 <body>
 <div class="card">
   <div class="teams" id="teams">Connecting…</div>
+  <div class="innings" id="innings"></div>
   <div class="score" id="score">–</div>
   <span class="status" id="status">—</span>
+  <div class="need" id="need" hidden></div>
   <div style="margin-top:14px">
+    <div class="row" id="firstRow" hidden><span id="firstLabel">1st innings</span><b id="first">–</b></div>
     <div class="row"><span>Overs</span><b id="overs">–</b></div>
     <div class="row"><span>Run rate</span><b id="rr">–</b></div>
     <div class="row" id="rrrRow" hidden><span>Required rate</span><b id="rrr">–</b></div>
     <div class="row"><span>Extras</span><b id="extras">–</b></div>
   </div>
+  <div class="result" id="result" hidden></div>
   <div class="hint" id="hint">Open with ?match=1</div>
 </div>
 <script>
@@ -39,14 +46,31 @@
   function render(s) {
     if (s.eventCount < last) return;           // ignore stale messages
     last = s.eventCount;
-    $('teams').textContent = s.teamA + ' vs ' + s.teamB + (s.target ? ' · target ' + s.target : '');
+    const done = s.status === 'COMPLETED';
+    $('teams').textContent = s.teamA + ' vs ' + s.teamB + ' · ' + s.oversLimit + ' overs';
+    $('innings').textContent = done ? 'Match complete'
+        : s.innings === 1 ? 'Innings 1 · ' + s.battingTeam + ' batting'
+        : 'Innings 2 · ' + s.battingTeam + ' chasing ' + s.target;
     $('score').textContent = s.runs + '/' + s.wickets;
     $('status').textContent = s.status;
     $('overs').textContent = s.overs + ' / ' + s.oversLimit;
     $('rr').textContent = s.runRate.toFixed(2);
     $('extras').textContent = s.extras;
+    $('firstRow').hidden = !s.firstInnings;
+    if (s.firstInnings) {
+      $('firstLabel').textContent = s.firstInnings.team + ' (1st innings)';
+      $('first').textContent = s.firstInnings.runs + '/' + s.firstInnings.wickets + ' (' + s.firstInnings.overs + ' ov)';
+    }
     $('rrrRow').hidden = s.requiredRunRate == null;
     if (s.requiredRunRate != null) $('rrr').textContent = s.requiredRunRate.toFixed(2);
+    const live2 = s.innings === 2 && s.status === 'LIVE';
+    $('need').hidden = !live2;
+    if (live2) {
+      const balls = s.oversLimit * 6 - s.legalBalls;
+      $('need').textContent = s.battingTeam + ' need ' + (s.target - s.runs) + ' from ' + balls + ' balls';
+    }
+    $('result').hidden = !s.result;
+    if (s.result) $('result').textContent = '🏆 ' + s.result;
   }
   const es = new EventSource('/api/matches/' + id + '/stream');
   es.addEventListener('score', (e) => { render(JSON.parse(e.data)); $('hint').textContent = 'Live · match ' + id; });

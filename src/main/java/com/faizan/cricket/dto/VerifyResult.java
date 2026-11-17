@@ -1,7 +1,7 @@
 package com.faizan.cricket.dto;
 
-import com.faizan.cricket.domain.ScoreState;
+import com.faizan.cricket.domain.MatchProgress;
 
-/** Result of rebuilding the score from the raw event log and comparing it with the stored score. */
-public record VerifyResult(boolean consistent, int events, ScoreState replayed, ScoreState stored) {
+/** Result of rebuilding the whole match (both innings and the result) from the raw event log. */
+public record VerifyResult(boolean consistent, int events, MatchProgress replayed, MatchProgress stored) {
 }
