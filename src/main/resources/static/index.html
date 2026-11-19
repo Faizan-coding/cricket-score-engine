@@ -1,21 +1,81 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Style Visible Section</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Cricket Score</title>
+<style>
+  [hidden] { display: none !important; }
+  :root { --bg:#f6f7f9; --card:#fff; --text:#16181d; --muted:#6a7280; --accent:#0a7d4f; --border:#e2e5ea; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#12141a; --card:#1b1e26; --text:#eceef2; --muted:#9aa3b2; --accent:#3ddc97; --border:#2a2e38; }
+  }
+  body { margin:0; font-family:system-ui,sans-serif; background:var(--bg); color:var(--text); display:grid; place-items:center; min-height:100vh; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:28px; width:min(92vw,420px); }
+  .teams { color:var(--muted); font-size:14px; }
+  .innings { font-size:14px; font-weight:600; margin-top:6px; }
+  .score { font-size:56px; font-weight:700; margin:8px 0; }
+  .row { display:flex; justify-content:space-between; color:var(--muted); font-size:14px; padding:4px 0; }
+  .row b { color:var(--text); }
+  .status { display:inline-block; font-size:12px; font-weight:600; color:var(--accent); border:1px solid var(--accent); border-radius:99px; padding:2px 10px; }
+  .need { margin-top:10px; font-size:14px; font-weight:600; color:var(--accent); }
+  .result { margin-top:14px; padding:12px; border-radius:10px; background:var(--accent); color:#fff; font-weight:700; text-align:center; }
+  .hint { color:var(--muted); font-size:12px; margin-top:16px; }
+</style>
 </head>
 <body>
-
-  <nav>
-    <a href="#about" target="_blank">About Us</a>
-    <a href="#courses" target="_blank">Courses</a>
-    <a href="#contact" target="_blank">Contact</a>
-  </nav>
-
-  <div id="about">We are a tech-driven education company.</div>
-  <div id="courses">We offer Full Stack and Data Science courses.</div>
-  <div id="contact">Reach us at contact@tapacademy.com.</div>
-
+<div class="card">
+  <div class="teams" id="teams">Waiting for match…</div>
+  <div class="innings" id="innings"></div>
+  <div class="score" id="score">–</div>
+  <span class="status" id="status">—</span>
+  <div class="need" id="need" hidden></div>
+  <div style="margin-top:14px">
+    <div class="row" id="firstRow" hidden><span id="firstLabel">1st innings</span><b id="first">–</b></div>
+    <div class="row"><span>Overs</span><b id="overs">–</b></div>
+    <div class="row"><span>Run rate</span><b id="rr">–</b></div>
+    <div class="row" id="rrrRow" hidden><span>Required rate</span><b id="rrr">–</b></div>
+    <div class="row"><span>Extras</span><b id="extras">–</b></div>
+  </div>
+  <div class="result" id="result" hidden></div>
+  <div class="hint" id="hint">Open with ?match=1</div>
+</div>
+<script>
+  const id = new URLSearchParams(location.search).get('match') || '1';
+  let last = -1;
+  const $ = (k) => document.getElementById(k);
+  function render(s) {
+    if (s.eventCount < last) return;           // ignore stale messages
+    last = s.eventCount;
+    const done = s.status === 'COMPLETED';
+    $('teams').textContent = s.teamA + ' vs ' + s.teamB + ' · ' + s.oversLimit + ' overs';
+    $('innings').textContent = done ? 'Match complete'
+        : s.innings === 1 ? 'Innings 1 · ' + s.battingTeam + ' batting'
+        : 'Innings 2 · ' + s.battingTeam + ' chasing ' + s.target;
+    $('score').textContent = s.runs + '/' + s.wickets;
+    $('status').textContent = s.status;
+    $('overs').textContent = s.overs + ' / ' + s.oversLimit;
+    $('rr').textContent = s.runRate.toFixed(2);
+    $('extras').textContent = s.extras;
+    $('firstRow').hidden = !s.firstInnings;
+    if (s.firstInnings) {
+      $('firstLabel').textContent = s.firstInnings.team + ' (1st innings)';
+      $('first').textContent = s.firstInnings.runs + '/' + s.firstInnings.wickets + ' (' + s.firstInnings.overs + ' ov)';
+    }
+    $('rrrRow').hidden = s.requiredRunRate == null;
+    if (s.requiredRunRate != null) $('rrr').textContent = s.requiredRunRate.toFixed(2);
+    const live2 = s.innings === 2 && s.status === 'LIVE';
+    $('need').hidden = !live2;
+    if (live2) {
+      const balls = s.oversLimit * 6 - s.legalBalls;
+      $('need').textContent = s.battingTeam + ' need ' + (s.target - s.runs) + ' from ' + balls + ' balls';
+    }
+    $('result').hidden = !s.result;
+    if (s.result) $('result').textContent = '🏆 ' + s.result;
+  }
+  const es = new EventSource('/api/matches/' + id + '/stream');
+  es.addEventListener('score', (e) => { render(JSON.parse(e.data)); $('hint').textContent = 'Live · match ' + id; });
+  es.onerror = () => { $('hint').textContent = 'No live match yet. Waiting for a match to start…'; };
+</script>
 </body>
 </html>
