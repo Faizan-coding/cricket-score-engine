@@ -29,6 +29,9 @@ public class BallEvent {
     @Column(name = "sequence_no", nullable = false)
     private int sequenceNo;
 
+    /** 1 or 2. over/ball below are counted within this innings. */
+    private int innings;
+
     private int overNumber;
     private int ballInOver;
 
@@ -48,11 +51,12 @@ public class BallEvent {
 
     protected BallEvent() {}
 
-    public BallEvent(Long matchId, String eventId, int sequenceNo, int overNumber, int ballInOver,
+    public BallEvent(Long matchId, String eventId, int sequenceNo, int innings, int overNumber, int ballInOver,
                      EventType type, int runs, String batter, String bowler) {
         this.matchId = matchId;
         this.eventId = eventId;
         this.sequenceNo = sequenceNo;
+        this.innings = innings;
         this.overNumber = overNumber;
         this.ballInOver = ballInOver;
         this.type = type;
@@ -65,6 +69,7 @@ public class BallEvent {
     public Long getMatchId() { return matchId; }
     public String getEventId() { return eventId; }
     public int getSequenceNo() { return sequenceNo; }
+    public int getInnings() { return innings; }
     public int getOverNumber() { return overNumber; }
     public int getBallInOver() { return ballInOver; }
     public EventType getType() { return type; }

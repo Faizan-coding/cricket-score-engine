@@ -39,7 +39,7 @@ public class MatchService {
 
     @Transactional
     public MatchState create(CreateMatchRequest r) {
-        Match m = matches.save(new Match(r.teamA(), r.teamB(), r.oversLimit(), r.target()));
+        Match m = matches.save(new Match(r.teamA(), r.teamB(), r.oversLimit()));
         return MatchState.from(m);
     }
 
@@ -87,15 +87,18 @@ public class MatchService {
             throw new InvalidEventException("Match is not live (status " + m.getStatus() + ")");
         }
 
-        ScoreState before = m.score();
-        ScoreState after = ScoreCalculator.apply(before, req.type(), req.runs(), m.getOversLimit());
+        MatchProgress before = m.progress();
+        MatchProgress after = MatchEngine.apply(before, req.type(), req.runs(), m.getOversLimit(),
+                m.getTeamA(), m.getTeamB());
 
-        int over = before.legalBalls() / ScoreCalculator.BALLS_PER_OVER;
-        int ball = before.legalBalls() % ScoreCalculator.BALLS_PER_OVER + 1;
+        // Over and ball are counted inside the innings the ball belongs to.
+        int legalBefore = before.current().legalBalls();
+        int over = legalBefore / ScoreCalculator.BALLS_PER_OVER;
+        int ball = legalBefore % ScoreCalculator.BALLS_PER_OVER + 1;
         BallEvent event = events.save(new BallEvent(matchId, req.eventId(), m.getEventCount() + 1,
-                over, ball, req.type(), req.runs(), req.batter(), req.bowler()));
+                before.innings(), over, ball, req.type(), req.runs(), req.batter(), req.bowler()));
 
-        m.applyScore(after);
+        m.applyProgress(after);
         matches.saveAndFlush(m); // flush now so a version conflict surfaces inside this attempt
 
         MatchState state = MatchState.from(m);
@@ -119,18 +122,20 @@ public class MatchService {
         return events.findByMatchIdOrderBySequenceNoAsc(id).stream().map(BallEventView::from).toList();
     }
 
-    /** Rebuilds the score from the raw event log and compares it with the stored score. */
+    /** Rebuilds both innings and the result from the raw event log and compares with the stored match. */
     @Transactional(readOnly = true)
     public VerifyResult verify(Long id) {
         Match m = find(id);
         List<BallEvent> log = events.findByMatchIdOrderBySequenceNoAsc(id);
-        ScoreState replayed = ScoreState.ZERO;
+        MatchProgress replayed = MatchProgress.start();
         for (BallEvent e : log) {
-            replayed = ScoreCalculator.apply(replayed, e.getType(), e.getRuns(), m.getOversLimit());
+            replayed = MatchEngine.apply(replayed, e.getType(), e.getRuns(), m.getOversLimit(),
+                    m.getTeamA(), m.getTeamB());
         }
-        ScoreState stored = m.score();
-        return new VerifyResult(replayed.equals(stored) && log.size() == m.getEventCount(),
-                log.size(), replayed, stored);
+        MatchProgress stored = m.progress();
+        boolean consistent = log.size() == m.getEventCount()
+                && (m.getStatus() == MatchStatus.SCHEDULED ? log.isEmpty() : replayed.equals(stored));
+        return new VerifyResult(consistent, log.size(), replayed, stored);
     }
 
     private Match find(Long id) {
